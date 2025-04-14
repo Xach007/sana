@@ -1,0 +1,11 @@
+{% load shop_tags %}
+
+<div class="price-display">
+    {% if has_discount %}
+        <del class="text-muted">{{ product.price|currency }}</del>
+        <span class="text-danger h5 mb-0">{{ product.sale_price|currency }}</span>
+        <span class="badge bg-danger ms-2">-{{ discount_percent }}%</span>
+    {% else %}
+        <span class="h5 mb-0">{{ product.price|currency }}</span>
+    {% endif %}
+</div>

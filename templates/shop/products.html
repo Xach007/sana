@@ -1,0 +1,363 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load shop_tags %}
+
+{% block title %}Каталог{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row">
+        <!-- Фильтры -->
+        <div class="col-md-3 mb-4">
+            <div class="filter-section">
+                <h4>Фильтры</h4>
+                <form method="get" id="filter-form">
+                    <div class="mb-3">
+                        <label class="form-label">Категории</label>
+                        {% for category in categories %}
+                        <div class="form-check">
+                            <input class="form-check-input filter-checkbox" type="checkbox" 
+                                   name="category" value="{{ category.id }}" 
+                                   id="category{{ category.id }}"
+                                   {% if category.id|stringformat:"s" in request.GET.getlist.category %}checked{% endif %}>
+                            <label class="form-check-label" for="category{{ category.id }}">
+                                {{ category.name }}
+                            </label>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Цена</label>
+                        <div class="input-group mb-2">
+                            <input type="number" class="form-control" name="min_price" 
+                                   placeholder="От" value="{{ request.GET.min_price }}">
+                            <input type="number" class="form-control" name="max_price" 
+                                   placeholder="До" value="{{ request.GET.max_price }}">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input filter-checkbox" type="checkbox" 
+                                   name="on_sale" id="onSale" value="1"
+                                   {% if request.GET.on_sale %}checked{% endif %}>
+                            <label class="form-check-label" for="onSale">
+                                Только со скидкой
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Сортировка</label>
+                        <select class="form-select" name="sort">
+                            <option value="name" {% if request.GET.sort == 'name' %}selected{% endif %}>По названию</option>
+                            <option value="price" {% if request.GET.sort == 'price' %}selected{% endif %}>По возрастанию цены</option>
+                            <option value="-price" {% if request.GET.sort == '-price' %}selected{% endif %}>По убыванию цены</option>
+                            <option value="newest" {% if request.GET.sort == 'newest' %}selected{% endif %}>Сначала новые</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100">Применить</button>
+                    <button type="button" onclick="resetFilters()" class="btn btn-outline-secondary w-100 mt-2">Сбросить</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Список товаров -->
+        <div class="col-md-9">
+            {% if products %}
+                <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+                    {% for product in products %}
+                        <div class="col">
+                            <div class="card product-card h-100 position-relative">
+                                <!-- Значки "Новое" и "Скидка" -->
+                                {% if product.is_featured %}
+                                    <span class="badge bg-success position-absolute top-0 start-0 m-2">Новое</span>
+                                {% endif %}
+                                {% if product.is_on_sale %}
+                                    <span class="badge bg-danger position-absolute top-0 end-0 m-2">Скидка</span>
+                                {% endif %}
+                                
+                                <!-- Изображение товара -->
+                                {% if product.image %}
+                                    <img src="{{ product.image.url }}" class="card-img-top" alt="{{ product.name }}">
+                                {% else %}
+                                    <img src="{% static 'img/no-image.png' %}" class="card-img-top" alt="Нет изображения">
+                                {% endif %}
+                                
+                                <!-- Информация о товаре -->
+                                <div class="card-body d-flex flex-column">
+                                    <h5 class="card-title">{{ product.name }}</h5>
+                                    <p class="card-text text-muted">{{ product.description|truncatewords:20 }}</p>
+                                    <div class="mt-auto">
+                                        <div class="price-display">
+                                            {% if product.is_on_sale %}
+                                                <del class="text-muted">{{ product.price|currency }}</del>
+                                                <span class="text-danger">{{ product.sale_price|currency }}</span>
+                                            {% else %}
+                                                <span>{{ product.price|currency }}</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="d-flex justify-content-between mt-3">
+                                            <a href="{% url 'shop:product_detail' product.slug %}" class="btn btn-outline-primary btn-sm">Подробнее</a>
+                                            <button class="btn btn-success btn-sm" onclick="addToCart('{{ product.id }}')">
+                                                <i class="fas fa-cart-plus"></i> В корзину
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Модальное окно для быстрого просмотра -->
+                <div class="modal fade" id="productModal" tabindex="-1" aria-labelledby="productModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="productModalLabel"></h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <img id="modalProductImage" src="" alt="" class="img-fluid">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div id="modalProductDescription" class="mb-3"></div>
+                                        <div class="price-section mb-3">
+                                            <del id="modalOriginalPrice" class="text-muted d-none"></del>
+                                            <span id="modalCurrentPrice" class="h4"></span>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="modalQuantity" class="form-label">Количество:</label>
+                                            <div class="input-group">
+                                                <button class="btn btn-outline-secondary" type="button" onclick="decrementQuantity()">-</button>
+                                                <input type="number" class="form-control text-center" id="modalQuantity" value="1" min="1">
+                                                <button class="btn btn-outline-secondary" type="button" onclick="incrementQuantity()">+</button>
+                                            </div>
+                                        </div>
+                                        <button class="btn btn-success w-100 mb-2" onclick="addToCart()" id="modalAddToCart">
+                                            <i class="fas fa-cart-plus"></i> В корзину
+                                        </button>
+                                        <a id="modalDetailLink" href="" class="btn btn-primary w-100">Подробнее</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Пагинация -->
+                {% if products.has_other_pages %}
+                    <nav aria-label="Page navigation" class="mt-4">
+                        <ul class="pagination justify-content-center">
+                            {% if products.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ products.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">&laquo;</a>
+                                </li>
+                            {% else %}
+                                <li class="page-item disabled">
+                                    <span class="page-link">&laquo;</span>
+                                </li>
+                            {% endif %}
+
+                            {% for page_num in products.paginator.page_range %}
+                                {% if page_num == products.number %}
+                                    <li class="page-item active">
+                                        <span class="page-link">{{ page_num }}</span>
+                                    </li>
+                                {% else %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ page_num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">{{ page_num }}</a>
+                                    </li>
+                                {% endif %}
+                            {% endfor %}
+
+                            {% if products.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ products.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">&raquo;</a>
+                                </li>
+                            {% else %}
+                                <li class="page-item disabled">
+                                    <span class="page-link">&raquo;</span>
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                {% endif %}
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-search fa-4x mb-3 text-muted"></i>
+                    <h3>Товары не найдены</h3>
+                    <p class="text-muted">Попробуйте изменить параметры фильтрации</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Автоматическая отправка формы при изменении фильтров
+    const filterForm = document.getElementById('filter-form');
+    const filterInputs = filterForm.querySelectorAll('input, select');
+    
+    filterInputs.forEach(input => {
+        input.addEventListener('change', () => filterForm.submit());
+    });
+});
+
+function resetFilters() {
+    // Очищаем все инпуты в форме
+    const filterForm = document.getElementById('filter-form');
+    const inputs = filterForm.querySelectorAll('input:not([type="submit"]), select');
+    inputs.forEach(input => {
+        if (input.type === 'checkbox') {
+            input.checked = false;
+        } else {
+            input.value = '';
+        }
+    });
+    
+    // Прокручиваем страницу вверх
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
+    // Отправляем форму
+    filterForm.submit();
+}
+
+function showProductModal(name, description, imageUrl, price, salePrice, isOnSale, slug) {
+    const modal = new bootstrap.Modal(document.getElementById('productModal'));
+    
+    // Заполняем данные в модальном окне
+    document.getElementById('productModalLabel').textContent = name;
+    document.getElementById('modalProductImage').src = imageUrl;
+    document.getElementById('modalProductDescription').textContent = description;
+    document.getElementById('modalDetailLink').href = `/product/${slug}/`;
+    document.getElementById('modalQuantity').value = 1;
+    
+    // Сохраняем данные о товаре для корзины
+    window.currentProduct = {
+        slug: slug,
+        name: name,
+        price: isOnSale === 'True' ? salePrice : price
+    };
+    
+    // Обработка цены
+    const originalPriceElement = document.getElementById('modalOriginalPrice');
+    const currentPriceElement = document.getElementById('modalCurrentPrice');
+    
+    if (isOnSale === 'True') {
+        originalPriceElement.textContent = `${price} ₽`;
+        originalPriceElement.classList.remove('d-none');
+        currentPriceElement.textContent = `${salePrice} ₽`;
+        currentPriceElement.classList.add('text-danger');
+    } else {
+        originalPriceElement.classList.add('d-none');
+        currentPriceElement.textContent = `${price} ₽`;
+        currentPriceElement.classList.remove('text-danger');
+    }
+    
+    modal.show();
+}
+
+function incrementQuantity() {
+    const quantityInput = document.getElementById('modalQuantity');
+    quantityInput.value = parseInt(quantityInput.value) + 1;
+}
+
+function decrementQuantity() {
+    const quantityInput = document.getElementById('modalQuantity');
+    const newValue = parseInt(quantityInput.value) - 1;
+    if (newValue >= 1) {
+        quantityInput.value = newValue;
+    }
+}
+
+function addToCart() {
+    const quantity = parseInt(document.getElementById('modalQuantity').value);
+    const product = window.currentProduct;
+    
+    fetch('/cart/add/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+            product_slug: product.slug,
+            quantity: quantity
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Показываем уведомление об успехе
+            alert('Товар добавлен в корзину!');
+            // Закрываем модальное окно
+            bootstrap.Modal.getInstance(document.getElementById('productModal')).hide();
+        } else {
+            alert('Ошибка при добавлении товара в корзину');
+        }
+    });
+}
+
+function quickAddToCart(productSlug, quantity) {
+    fetch('/cart/add/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+            product_slug: productSlug,
+            quantity: quantity
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Товар добавлен в корзину!');
+        } else {
+            showToast('Ошибка при добавлении товара', 'error');
+        }
+    });
+}
+
+function showToast(message, type = 'success') {
+    const toastDiv = document.createElement('div');
+    toastDiv.className = `toast position-fixed bottom-0 end-0 m-3 text-white bg-${type === 'success' ? 'success' : 'danger'}`;
+    toastDiv.setAttribute('role', 'alert');
+    toastDiv.innerHTML = `
+        <div class="toast-body">
+            ${message}
+        </div>
+    `;
+    document.body.appendChild(toastDiv);
+    const toast = new bootstrap.Toast(toastDiv);
+    toast.show();
+    setTimeout(() => toastDiv.remove(), 3000);
+}
+
+// Функция для получения CSRF-токена
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %}

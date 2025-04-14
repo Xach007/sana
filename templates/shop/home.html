@@ -1,0 +1,211 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load shop_tags %}
+
+{% block title %}Главная - Магазин кроссовок{% endblock %}
+
+{% block content %}
+<!-- Слайдер с рекламой -->
+<div id="mainCarousel" class="carousel slide mb-5" data-bs-ride="carousel">
+    <div class="carousel-indicators">
+        <button type="button" data-bs-target="#mainCarousel" data-bs-slide-to="0" class="active"></button>
+        <button type="button" data-bs-target="#mainCarousel" data-bs-slide-to="1"></button>
+        <button type="button" data-bs-target="#mainCarousel" data-bs-slide-to="2"></button>
+    </div>
+    <div class="carousel-inner">
+        <div class="carousel-item active">
+            <img src="{% static 'img/slide1.jpg' %}" class="d-block w-100" alt="Реклама 1">
+            <div class="carousel-caption">
+                <h2 class="animate__animated animate__fadeInDown">Новая коллекция</h2>
+                <p class="animate__animated animate__fadeInUp">Встречайте весну в новой паре кроссовок</p>
+                <a href="{% url 'shop:products' %}" class="btn btn-primary animate__animated animate__fadeInUp">Смотреть</a>
+            </div>
+        </div>
+        <div class="carousel-item">
+            <img src="{% static 'img/slide2.jpg' %}" class="d-block w-100" alt="Реклама 2">
+            <div class="carousel-caption">
+                <h2 class="animate__animated animate__fadeInDown">Скидки до 50%</h2>
+                <p class="animate__animated animate__fadeInUp">На selected модели этого сезона</p>
+                <a href="{% url 'shop:products' %}?on_sale=true" class="btn btn-danger animate__animated animate__fadeInUp">К акциям</a>
+            </div>
+        </div>
+        <div class="carousel-item">
+            <img src="{% static 'img/slide3.jpg' %}" class="d-block w-100" alt="Реклама 3">
+            <div class="carousel-caption">
+                <h2 class="animate__animated animate__fadeInDown">Бесплатная доставка</h2>
+                <p class="animate__animated animate__fadeInUp">При заказе от 5000 рублей</p>
+                <a href="{% url 'shop:about' %}" class="btn btn-success animate__animated animate__fadeInUp">Подробнее</a>
+            </div>
+        </div>
+    </div>
+    <button class="carousel-control-prev" type="button" data-bs-target="#mainCarousel" data-bs-slide="prev">
+        <span class="carousel-control-prev-icon"></span>
+    </button>
+    <button class="carousel-control-next" type="button" data-bs-target="#mainCarousel" data-bs-slide="next">
+        <span class="carousel-control-next-icon"></span>
+    </button>
+</div>
+
+<div class="container">
+    <!-- Популярные товары -->
+    {% if featured_products %}
+    <section class="mb-5">
+        <h2 class="text-center mb-4">Популярные модели</h2>
+        <div class="row">
+            {% for product in featured_products %}
+            <div class="col-md-3 mb-4">
+                <div class="card product-card h-100 animate__animated animate__fadeIn">
+                    {% if product.image %}
+                        <img src="{{ product.image.url }}" class="card-img-top product-image" alt="{{ product.name }}">
+                    {% else %}
+                        <img src="{% static 'img/no-image.png' %}" class="card-img-top product-image" alt="Нет изображения">
+                    {% endif %}
+                    {% if product.is_on_sale %}
+                    <div class="sale-badge">Sale!</div>
+                    {% endif %}
+                    <div class="card-body">
+                        <h5 class="card-title">{{ product.name }}</h5>
+                        <p class="card-text text-truncate">{{ product.description }}</p>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            {% if product.is_on_sale %}
+                            <del class="text-muted">{{ product.price }} ₽</del>
+                            <span class="text-danger">{{ product.sale_price }} ₽</span>
+                            {% else %}
+                            {{ product.price }} ₽
+                            {% endif %}
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <button onclick="addToCart('{{ product.id }}')" class="btn btn-primary btn-sm">
+                                В корзину
+                            </button>
+                            <button onclick="toggleFavorite('{{ product.id }}', this)" 
+                                    class="btn btn-outline-danger btn-sm favorite-btn {% if product.id in favorite_products %}active{% endif %}"
+                                    data-bs-toggle="tooltip" 
+                                    title="{% if product.id in favorite_products %}Убрать из избранного{% else %}Добавить в избранное{% endif %}">
+                                <i class="{% if product.id in favorite_products %}fas{% else %}far{% endif %} fa-heart"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    <!-- Специальные предложения -->
+    {% if sale_products %}
+    <section class="bg-light py-5 mb-5">
+        <div class="container">
+            <h2 class="text-center mb-4">Специальные предложения</h2>
+            <div class="row">
+                {% for product in sale_products %}
+                <div class="col-md-3 mb-4">
+                    <div class="card product-card h-100 animate__animated animate__fadeIn">
+                        <div class="sale-badge">-{{ product.discount_percentage }}%</div>
+                        {% if product.image %}
+                            <img src="{{ product.image.url }}" class="card-img-top product-image" alt="{{ product.name }}">
+                        {% else %}
+                            <img src="{% static 'img/no-image.png' %}" class="card-img-top product-image" alt="Нет изображения">
+                        {% endif %}
+                        <div class="card-body">
+                            <h5 class="card-title">{{ product.name }}</h5>
+                            <p class="card-text text-truncate">{{ product.description }}</p>
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                {% if product.is_on_sale %}
+                                <del class="text-muted">{{ product.price }} ₽</del>
+                                <span class="text-danger">{{ product.sale_price }} ₽</span>
+                                {% else %}
+                                {{ product.price }} ₽
+                                {% endif %}
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <button onclick="addToCart('{{ product.id }}')" class="btn btn-primary btn-sm">
+                                    В корзину
+                                </button>
+                                <button onclick="toggleFavorite('{{ product.id }}', this)" 
+                                        class="btn btn-outline-danger btn-sm favorite-btn {% if product.id in favorite_products %}active{% endif %}"
+                                        data-bs-toggle="tooltip" 
+                                        title="{% if product.id in favorite_products %}Убрать из избранного{% else %}Добавить в избранное{% endif %}">
+                                    <i class="{% if product.id in favorite_products %}fas{% else %}far{% endif %} fa-heart"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
+    <!-- Преимущества -->
+    <section class="mb-5">
+        <div class="row text-center">
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <i class="fas fa-truck fa-3x mb-3 text-primary"></i>
+                        <h4>Быстрая доставка</h4>
+                        <p>По всей России</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <i class="fas fa-shield-alt fa-3x mb-3 text-primary"></i>
+                        <h4>Гарантия качества</h4>
+                        <p>100% оригинальная продукция</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <i class="fas fa-undo fa-3x mb-3 text-primary"></i>
+                        <h4>Возврат</h4>
+                        <p>14 дней на обмен и возврат</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://kit.fontawesome.com/your-fontawesome-kit.js" crossorigin="anonymous"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Анимация элементов при прокрутке
+    function animateOnScroll() {
+        const elements = document.querySelectorAll('.animate__animated');
+        elements.forEach(element => {
+            if (isElementInViewport(element)) {
+                element.style.visibility = 'visible';
+                element.style.opacity = '1';
+            }
+        });
+    }
+
+    function isElementInViewport(el) {
+        const rect = el.getBoundingClientRect();
+        return (
+            rect.top >= 0 &&
+            rect.left >= 0 &&
+            rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
+            rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+        );
+    }
+
+    window.addEventListener('scroll', animateOnScroll);
+    animateOnScroll();
+});
+
+$(document).ready(function() {
+    // Инициализация всплывающих подсказок
+    $('[data-bs-toggle="tooltip"]').tooltip();
+});
+</script>
+{% endblock %}
