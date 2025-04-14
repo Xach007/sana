@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Поиск: {{ query }} - Магазин кроссовок{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mb-4">Результаты поиска: {{ query }}</h2>
+    
+    {% if products %}
+        <div class="row">
+            {% for product in products %}
+            <div class="col-md-3 mb-4">
+                <div class="card product-card h-100 animate__animated animate__fadeIn">
+                    {% if product.image %}
+                        <img src="{{ product.image.url }}" class="card-img-top product-image" alt="{{ product.name }}">
+                    {% else %}
+                        <img src="{% static 'img/no-image.png' %}" class="card-img-top product-image" alt="Нет изображения">
+                    {% endif %}
+                    {% if product.is_on_sale %}
+                        <div class="sale-badge">-{{ product.discount_percentage }}%</div>
+                    {% endif %}
+                    <div class="card-body">
+                        <h5 class="card-title">{{ product.name }}</h5>
+                        <p class="card-text text-truncate">{{ product.description }}</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="price">
+                                {% if product.is_on_sale %}
+                                    <del class="text-muted">{{ product.price }} ₽</del>
+                                    <span class="text-danger">{{ product.sale_price }} ₽</span>
+                                {% else %}
+                                    {{ product.price }} ₽
+                                {% endif %}
+                            </span>
+                            <button onclick="addToCart('{{ product.id }}')" class="btn btn-primary btn-sm">
+                                В корзину
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if products.has_other_pages %}
+        <nav aria-label="Page navigation" class="mt-4">
+            <ul class="pagination justify-content-center">
+                {% if products.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?q={{ query }}&page={{ products.previous_page_number }}">
+                        Назад
+                    </a>
+                </li>
+                {% endif %}
+
+                {% for num in products.paginator.page_range %}
+                <li class="page-item {% if products.number == num %}active{% endif %}">
+                    <a class="page-link" href="?q={{ query }}&page={{ num }}">{{ num }}</a>
+                </li>
+                {% endfor %}
+
+                {% if products.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?q={{ query }}&page={{ products.next_page_number }}">
+                        Вперед
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+    {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-search fa-4x text-muted mb-3"></i>
+            <h3>Ничего не найдено</h3>
+            <p class="text-muted">Попробуйте изменить параметры поиска</p>
+            <a href="{% url 'shop:products' %}" class="btn btn-primary mt-3">
+                Перейти к каталогу
+            </a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

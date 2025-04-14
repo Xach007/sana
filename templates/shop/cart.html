@@ -1,0 +1,189 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load shop_tags %}
+
+{% block title %}Корзина - Магазин кроссовок{% endblock %}
+
+{% block content %}
+{% if user.is_authenticated %}
+    {% if cart_items %}
+    <div class="cart-section animate__animated animate__fadeIn">
+        <h2 class="mb-4">Корзина</h2>
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Товар</th>
+                        <th>Цена</th>
+                        <th>Количество</th>
+                        <th>Итого</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in cart_items %}
+                    <div id="cart-item-{{ item.id }}" class="cart-item" data-price="{{ item.product.sale_price|default:item.product.price }}">
+                        <tr>
+                            <td class="align-middle">
+                                <div class="d-flex align-items-center">
+                                    {% if item.product.image %}
+                                        <img src="{{ item.product.image.url }}" alt="{{ item.product.name }}" 
+                                             class="img-thumbnail me-3" style="width: 100px;">
+                                    {% else %}
+                                        <img src="{% static 'img/no-image.png' %}" alt="Нет изображения" 
+                                             class="img-thumbnail me-3" style="width: 100px;">
+                                    {% endif %}
+                                    <div>
+                                        <h6 class="mb-0">{{ item.product.name }}</h6>
+                                        <small class="text-muted">{{ item.product.category.name }}</small>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="align-middle">
+                                {% if item.product.is_on_sale %}
+                                    <del class="text-muted">{{ item.product.price }} ₽</del><br>
+                                    <span class="text-danger">{{ item.product.sale_price }} ₽</span>
+                                {% else %}
+                                    {{ item.product.price }} ₽
+                                {% endif %}
+                            </td>
+                            <td class="align-middle">
+                                <div class="quantity-control input-group">
+                                    <button class="btn btn-outline-secondary" type="button" 
+                                            onclick="updateQuantity('{{ item.id }}', -1)">-</button>
+                                    <input type="number" class="form-control quantity-input text-center" 
+                                           value="{{ item.quantity }}" min="1" 
+                                           onchange="updateQuantity('{{ item.id }}', 0)">
+                                    <button class="btn btn-outline-secondary" type="button" 
+                                            onclick="updateQuantity('{{ item.id }}', 1)">+</button>
+                                </div>
+                            </td>
+                            <td class="align-middle">
+                                <strong class="item-total">
+                                    {% if item.product.is_on_sale %}
+                                        {{ item.product.sale_price|multiply:item.quantity }} ₽
+                                    {% else %}
+                                        {{ item.product.price|multiply:item.quantity }} ₽
+                                    {% endif %}
+                                </strong>
+                            </td>
+                            <td class="align-middle">
+                                <button class="btn btn-outline-danger" type="button"
+                                        onclick="removeFromCart('{{ item.id }}')" 
+                                        data-bs-toggle="tooltip" 
+                                        title="Удалить из корзины">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    </div>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="3" class="text-end"><strong>Общая сумма:</strong></td>
+                        <td><strong id="cart-total">{{ total_sum }} ₽</strong></td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        
+        <div class="d-flex justify-content-end mt-4">
+            <a href="{% url 'shop:products' %}" class="btn btn-outline-secondary me-2">
+                Продолжить покупки
+            </a>
+            <button class="btn btn-primary" onclick="checkout()">
+                Оформить заказ
+            </button>
+        </div>
+    </div>
+    {% else %}
+    <div class="text-center py-5">
+        <i class="fas fa-shopping-cart fa-4x text-muted mb-3"></i>
+        <h3>Ваша корзина пуста</h3>
+        <p class="text-muted">Добавьте товары в корзину, чтобы оформить заказ</p>
+        <a href="{% url 'shop:products' %}" class="btn btn-primary mt-3">
+            Перейти к товарам
+        </a>
+    </div>
+    {% endif %}
+{% else %}
+<div class="text-center py-5">
+    <i class="fas fa-user-lock fa-4x text-muted mb-3"></i>
+    <h3>Необходима авторизация</h3>
+    <p class="text-muted">Для доступа к корзине необходимо войти в систему</p>
+    <div class="mt-3">
+        <a href="{% url 'login' %}?next={% url 'shop:cart' %}" class="btn btn-primary me-2">
+            Войти
+        </a>
+        <a href="{% url 'accounts:register' %}?next={% url 'shop:cart' %}" class="btn btn-outline-primary">
+            Зарегистрироваться
+        </a>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://kit.fontawesome.com/your-fontawesome-kit.js" crossorigin="anonymous"></script>
+<script>
+function updateQuantity(itemId, change) {
+    const input = document.querySelector(`#cart-item-${itemId} .quantity-input`);
+    const newValue = parseInt(input.value) + change;
+    if (newValue >= 1) {
+        input.value = newValue;
+        const cartItem = document.getElementById(`cart-item-${itemId}`);
+        const price = parseFloat(cartItem.dataset.price);
+        const itemTotal = cartItem.querySelector('.item-total');
+        itemTotal.textContent = `${(price * newValue).toFixed(2)} ₽`;
+        
+        $.ajax({
+            url: `/shop/update-cart/${itemId}/`,
+            method: 'POST',
+            data: {
+                quantity: newValue
+            },
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            success: function(response) {
+                if (response.status === 'success') {
+                    updateCartTotal();
+                    updateCartCounter(response.cart_count);
+                }
+            },
+            error: function() {
+                showNotification('Произошла ошибка при обновлении количества', 'error');
+            }
+        });
+    }
+}
+
+function updateCartTotal() {
+    let total = 0;
+    document.querySelectorAll('.cart-item').forEach(item => {
+        const price = parseFloat(item.dataset.price);
+        const quantity = parseInt(item.querySelector('.quantity-input').value);
+        if (!isNaN(price) && !isNaN(quantity)) {
+            total += price * quantity;
+        }
+    });
+    
+    const totalElement = document.getElementById('cart-total');
+    if (totalElement) {
+        totalElement.textContent = `${total.toFixed(2)} ₽`;
+    }
+}
+
+function checkout() {
+    // Здесь будет логика оформления заказа
+    alert('Функция оформления заказа находится в разработке');
+}
+
+// Инициализация при загрузке страницы
+document.addEventListener('DOMContentLoaded', function() {
+    updateCartTotal();
+});
+</script>
+{% endblock %}
